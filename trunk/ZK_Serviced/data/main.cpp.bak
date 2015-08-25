@@ -1,0 +1,62 @@
+#include <iostream>
+#include <tr1/memory>
+#include <stdlib.h>
+#include <signal.h>
+#include <zk_framework/zk_framework.h>
+#include <daemon/daemonize.h>
+#include <daemon/check_worker.h>
+#include <glog/logging.h>
+#include <gflags/gflags.h>
+
+
+DEFINE_bool(daemonize, false, "Run as daemon");
+//DEFINE_string(pid_path, "/home/s/var/proc/", "The directory of pid file for chk_worker_alive.");
+DEFINE_string(pid_path, "../logs/", "The directory of pid file for chk_worker_alive.");
+DEFINE_string(log_path, "../logs/","log path");
+DEFINE_string(zk_host, "10.119.121.16:2181,10.119.121.37:2182,10.119.112.246:2183,10.119.112.247:2184,10.119.112.248:2185","zookeeper server host");
+DEFINE_int32(zk_timeout, 3000,"zookeeper timeout");
+
+
+void initsignal() {
+	signal(SIGTERM, SIG_IGN);
+	signal(SIGINT,  SIG_IGN);
+	signal(SIGALRM, SIG_IGN);
+	signal(SIGKILL, SIG_IGN);
+	signal(SIGQUIT, SIG_IGN);
+	signal(SIGABRT, SIG_IGN);
+	signal(SIGFPE,  SIG_IGN);
+}
+int main(int argc, char **argv) {
+	initsignal();
+
+	CheckWorkerFile pid_file(argc, argv);
+	Daemonize daemonize;
+	::google::ParseCommandLineFlags(&argc, &argv, true);
+	daemonize.Init();
+	pid_file.Init();
+
+	std::string log_info = FLAGS_log_path + "/info.";
+	std::string log_error = FLAGS_log_path + "/error.";
+	::google::SetLogDestination(::google::ERROR, log_error.c_str());
+	::google::SetLogDestination(::google::INFO, log_info.c_str());
+	::google::InitGoogleLogging(argv[0]);
+
+
+	LOG(INFO) << "start " << argv[0];
+	std::tr1::shared_ptr<ZKOP> pzoo(new ZKOP());
+	bool ret_init = pzoo->zkInit(FLAGS_zk_host, 
+			std::tr1::bind(&ZKOP::zkWatcher,
+				*pzoo,
+				std::tr1::placeholders::_1,
+				std::tr1::placeholders::_2,
+				std::tr1::placeholders::_3
+				),
+			FLAGS_zk_timeout);
+	if(ret_init) {
+		LOG(INFO) << "zk ini ok" << argv[0];
+	}
+
+	LOG(INFO) << "exit " << argv[0];
+
+	return EXIT_SUCCESS;
+}

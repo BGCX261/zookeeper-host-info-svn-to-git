@@ -1,0 +1,1 @@
+svn checkout http://zookeeper-host-info.googlecode.com/svn/trunk/ zookeeper-host-info-read-only
